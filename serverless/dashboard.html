@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FeatherFlight Metrics</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+  <style>
+    :root { color-scheme: light dark; --bg:#0f172a; --card:#111827; --text:#e5e7eb; --muted:#9ca3af; --accent:#38bdf8; --ok:#22c55e; --bad:#f87171; --warn:#fbbf24; --border:#374151; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { min-height: 100vh; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); padding: 24px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { font-size: 28px; margin-bottom: 4px; }
+    .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+    .controls { display: flex; gap: 10px; align-items: center; margin-bottom: 24px; flex-wrap: wrap; }
+    .controls button { padding: 8px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--text); cursor: pointer; font-size: 14px; }
+    .controls button.active { background: var(--accent); color: #001018; border-color: var(--accent); font-weight: 700; }
+    .controls button:hover { border-color: var(--accent); }
+    .controls .refresh { margin-left: auto; }
+    .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+    .kpi .label { color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .kpi .value { font-size: 32px; font-weight: 800; }
+    .kpi .value.ok { color: var(--ok); }
+    .kpi .value.bad { color: var(--bad); }
+    .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+    .chart-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+    .chart-card h3 { font-size: 15px; margin-bottom: 14px; color: var(--muted); }
+    .chart-card canvas { max-height: 280px; }
+    .section-title { font-size: 18px; font-weight: 700; margin: 28px 0 14px; }
+    table { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; font-size: 13px; }
+    th { background: #1a2332; color: var(--muted); text-transform: uppercase; font-size: 11px; letter-spacing: .5px; padding: 12px 14px; text-align: left; position: sticky; top: 0; }
+    td { padding: 10px 14px; border-top: 1px solid var(--border); }
+    tr:hover td { background: rgba(56,189,248,.05); }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+    .badge.ok { background: rgba(34,197,94,.15); color: var(--ok); }
+    .badge.bad { background: rgba(248,113,113,.15); color: var(--bad); }
+    .badge.partial { background: rgba(251,191,36,.15); color: var(--warn); }
+    .badge.info { background: rgba(56,189,248,.15); color: var(--accent); }
+    .email-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .email-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+    .email-card .name { font-weight: 700; margin-bottom: 8px; word-break: break-all; }
+    .email-card .stat { display: flex; justify-content: space-between; color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+    .email-card .stat span:last-child { color: var(--text); font-weight: 600; }
+    .bar-bg { height: 6px; background: #1f2937; border-radius: 3px; margin-top: 8px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 3px; background: var(--ok); transition: width .4s; }
+    #password-screen { display: flex; align-items: center; justify-content: center; min-height: 80vh; }
+    #password-screen .box { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 36px; width: 100%; max-width: 380px; text-align: center; }
+    #password-screen input { width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: #030712; color: var(--text); font: inherit; margin: 16px 0; }
+    #password-screen button { width: 100%; padding: 12px; border: 0; border-radius: 10px; background: var(--accent); color: #001018; font-weight: 800; cursor: pointer; }
+    .loading { text-align: center; padding: 60px; color: var(--muted); }
+    .error-msg { background: rgba(248,113,113,.1); border: 1px solid var(--bad); border-radius: 10px; padding: 14px; color: var(--bad); margin-bottom: 20px; display: none; }
+    @media (max-width: 700px) { .charts { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div id="password-screen">
+    <div class="box">
+      <h1 style="margin-bottom:8px">FeatherFlight Metrics</h1>
+      <p style="color:var(--muted);font-size:14px">Enter dashboard password</p>
+      <input id="pw-input" type="password" placeholder="Password" autocomplete="off" />
+      <button id="pw-btn">View Dashboard</button>
+      <p id="pw-error" style="color:var(--bad);font-size:13px;margin-top:10px;display:none"></p>
+    </div>
+  </div>
+
+  <div id="app" class="container" style="display:none">
+    <h1>FeatherFlight Metrics</h1>
+    <p class="subtitle" id="subtitle">Loading...</p>
+    <div id="error-msg" class="error-msg"></div>
+    <div class="controls">
+      <button data-range="7d">7 days</button>
+      <button data-range="30d" class="active">30 days</button>
+      <button data-range="90d">90 days</button>
+      <button data-range="all">All time</button>
+      <button class="refresh" id="refresh-btn" style="font-size:18px" title="Refresh">↻</button>
+    </div>
+    <div class="kpi-row" id="kpis"></div>
+    <div class="charts">
+      <div class="chart-card">
+        <h3>Booking Attempts Over Time</h3>
+        <canvas id="chart-timeline"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Failure Reasons</h3>
+        <canvas id="chart-failures"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Popular Time Slots</h3>
+        <canvas id="chart-slots"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Requests by Source</h3>
+        <canvas id="chart-sources"></canvas>
+      </div>
+    </div>
+    <div class="section-title">Per-Account Breakdown</div>
+    <div class="email-grid" id="email-grid"></div>
+    <div class="section-title">Recent Activity</div>
+    <div style="overflow-x:auto">
+      <table id="recent-table">
+        <thead>
+          <tr><th>Time</th><th>Email</th><th>Slot</th><th>Status</th><th>Source</th><th>Duration</th><th>Details</th></tr>
+        </thead>
+        <tbody id="recent-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    const METRICS_API = "__METRICS_URL__";
+    const LS_KEY = "ff_metrics_pw";
+
+    let currentRange = "30d";
+    let charts = {};
+
+    // --- Password gate ---
+    const stored = localStorage.getItem(LS_KEY);
+    if (stored) { verifyAndLoad(stored); }
+
+    document.getElementById("pw-btn").addEventListener("click", () => {
+      const pw = document.getElementById("pw-input").value;
+      if (!pw) return;
+      verifyAndLoad(pw);
+    });
+    document.getElementById("pw-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") document.getElementById("pw-btn").click();
+    });
+
+    async function verifyAndLoad(password) {
+      const errEl = document.getElementById("pw-error");
+      errEl.style.display = "none";
+      try {
+        const resp = await fetch(`${METRICS_API}?password=${encodeURIComponent(password)}&range=30d`);
+        if (resp.status === 401) {
+          errEl.textContent = "Wrong password.";
+          errEl.style.display = "block";
+          localStorage.removeItem(LS_KEY);
+          return;
+        }
+        if (!resp.ok) {
+          errEl.textContent = `Error: ${resp.status}`;
+          errEl.style.display = "block";
+          return;
+        }
+        localStorage.setItem(LS_KEY, password);
+        document.getElementById("password-screen").style.display = "none";
+        document.getElementById("app").style.display = "block";
+        const data = await resp.json();
+        render(data);
+      } catch (e) {
+        errEl.textContent = `Network error: ${e.message}`;
+        errEl.style.display = "block";
+      }
+    }
+
+    // --- Range controls ---
+    document.querySelectorAll("[data-range]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("[data-range]").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentRange = btn.dataset.range;
+        loadData();
+      });
+    });
+    document.getElementById("refresh-btn").addEventListener("click", loadData);
+
+    async function loadData() {
+      const pw = localStorage.getItem(LS_KEY);
+      if (!pw) return;
+      const errEl = document.getElementById("error-msg");
+      errEl.style.display = "none";
+      try {
+        const resp = await fetch(`${METRICS_API}?password=${encodeURIComponent(pw)}&range=${currentRange}`);
+        if (resp.status === 401) {
+          localStorage.removeItem(LS_KEY);
+          location.reload();
+          return;
+        }
+        if (!resp.ok) throw new Error(`${resp.status}`);
+        render(await resp.json());
+      } catch (e) {
+        errEl.textContent = `Failed to load: ${e.message}`;
+        errEl.style.display = "block";
+      }
+    }
+
+    // --- Render ---
+    function render(data) {
+      document.getElementById("subtitle").textContent =
+        `Range: ${data.range || currentRange} · Updated: ${new Date().toLocaleString()}`;
+      renderKPIs(data);
+      renderTimeline(data);
+      renderFailures(data);
+      renderSlots(data);
+      renderSources(data);
+      renderEmails(data);
+      renderRecent(data);
+    }
+
+    function renderKPIs(d) {
+      const el = document.getElementById("kpis");
+      el.innerHTML = [
+        kpi("Total Attempts", d.total, ""),
+        kpi("Success Rate", d.success_rate + "%", d.success_rate >= 90 ? "ok" : d.success_rate >= 70 ? "" : "bad"),
+        kpi("Successful", d.success_count, "ok"),
+        kpi("Failed", d.failure_count, d.failure_count > 0 ? "bad" : ""),
+        kpi("Avg Duration", d.avg_duration_ms ? (d.avg_duration_ms / 1000).toFixed(1) + "s" : "—", ""),
+      ].join("");
+    }
+
+    function kpi(label, value, cls) {
+      return `<div class="kpi"><div class="label">${label}</div><div class="value ${cls}">${value}</div></div>`;
+    }
+
+    function renderTimeline(d) {
+      const days = Object.keys(d.by_day || {});
+      const success = days.map(day => (d.by_day[day].success || 0));
+      const failure = days.map(day => (d.by_day[day].failure || 0));
+      const labels = days.map(day => {
+        const parts = day.split("-");
+        return `${parts[1]}/${parts[2]}`;
+      });
+      if (charts.timeline) charts.timeline.destroy();
+      charts.timeline = new Chart(document.getElementById("chart-timeline"), {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            { label: "Success", data: success, backgroundColor: "rgba(34,197,94,.7)", borderRadius: 4 },
+            { label: "Failed", data: failure, backgroundColor: "rgba(248,113,113,.7)", borderRadius: 4 },
+          ],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: { stacked: true, ticks: { color: "#9ca3af", maxRotation: 45 }, grid: { display: false } },
+            y: { stacked: true, beginAtZero: true, ticks: { color: "#9ca3af", stepSize: 1 }, grid: { color: "rgba(55,65,81,.5)" } },
+          },
+          plugins: { legend: { labels: { color: "#e5e7eb" } } },
+        },
+      });
+    }
+
+    function renderFailures(d) {
+      const reasons = d.failure_reasons || {};
+      const labels = Object.keys(reasons);
+      const values = Object.values(reasons);
+      const colors = ["#f87171","#fbbf24","#fb923c","#a78bfa","#38bdf8","#34d399","#f472b6"];
+      if (charts.failures) charts.failures.destroy();
+      if (labels.length === 0) {
+        charts.failures = new Chart(document.getElementById("chart-failures"), {
+          type: "doughnut",
+          data: { labels: ["No failures"], datasets: [{ data: [1], backgroundColor: ["rgba(55,65,81,.5)"] }] },
+          options: { responsive: true, plugins: { legend: { labels: { color: "#9ca3af" } } } },
+        });
+        return;
+      }
+      charts.failures = new Chart(document.getElementById("chart-failures"), {
+        type: "doughnut",
+        data: {
+          labels,
+          datasets: [{ data: values, backgroundColor: colors.slice(0, labels.length) }],
+        },
+        options: { responsive: true, plugins: { legend: { position: "right", labels: { color: "#e5e7eb", font: { size: 12 } } } } },
+      });
+    }
+
+    function renderSlots(d) {
+      const slots = d.by_slot || {};
+      // Sort by slot time
+      const timeOrder = ["4:00 PM","5:00 PM","6:00 PM","7:00 PM","8:00 PM","9:00 PM"];
+      const labels = Object.keys(slots).sort((a, b) => timeOrder.indexOf(a) - timeOrder.indexOf(b));
+      const success = labels.map(l => slots[l].success || 0);
+      const failure = labels.map(l => slots[l].failure || 0);
+      if (charts.slots) charts.slots.destroy();
+      charts.slots = new Chart(document.getElementById("chart-slots"), {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            { label: "Success", data: success, backgroundColor: "rgba(34,197,94,.7)", borderRadius: 4 },
+            { label: "Failed", data: failure, backgroundColor: "rgba(248,113,113,.7)", borderRadius: 4 },
+          ],
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true,
+          scales: {
+            x: { stacked: true, beginAtZero: true, ticks: { color: "#9ca3af", stepSize: 1 }, grid: { color: "rgba(55,65,81,.5)" } },
+            y: { stacked: true, ticks: { color: "#e5e7eb" }, grid: { display: false } },
+          },
+          plugins: { legend: { labels: { color: "#e5e7eb" } } },
+        },
+      });
+    }
+
+    function renderSources(d) {
+      const sources = d.by_source || {};
+      const labels = Object.keys(sources);
+      const values = Object.values(sources);
+      const colors = { web_ui: "#38bdf8", cron: "#a78bfa", manual: "#fbbf24", unknown: "#6b7280" };
+      if (charts.sources) charts.sources.destroy();
+      charts.sources = new Chart(document.getElementById("chart-sources"), {
+        type: "doughnut",
+        data: {
+          labels: labels.map(l => l || "unknown"),
+          datasets: [{ data: values, backgroundColor: labels.map(l => colors[l] || "#6b7280") }],
+        },
+        options: { responsive: true, plugins: { legend: { position: "right", labels: { color: "#e5e7eb" } } } },
+      });
+    }
+
+    function renderEmails(d) {
+      const el = document.getElementById("email-grid");
+      const emails = d.by_email || {};
+      el.innerHTML = Object.entries(emails).map(([email, stats]) => {
+        const rate = stats.attempts ? Math.round(stats.success / stats.attempts * 100) : 0;
+        return `
+          <div class="email-card">
+            <div class="name">${esc(email)}</div>
+            <div class="stat"><span>Attempts</span><span>${stats.attempts}</span></div>
+            <div class="stat"><span>Successful</span><span style="color:var(--ok)">${stats.success}</span></div>
+            <div class="stat"><span>Failed</span><span style="color:var(--bad)">${stats.failure}</span></div>
+            <div class="stat"><span>Success Rate</span><span>${rate}%</span></div>
+            <div class="bar-bg"><div class="bar-fill" style="width:${rate}%"></div></div>
+          </div>`;
+      }).join("");
+    }
+
+    function renderRecent(d) {
+      const el = document.getElementById("recent-body");
+      const rows = (d.recent || []).map(e => {
+        const time = e.timestamp ? new Date(e.timestamp).toLocaleString() : "—";
+        const slot = `${esc(e.date || "")} ${esc(e.time || "")}`;
+        let statusBadge;
+        if (e.status === "success") statusBadge = '<span class="badge ok">Success</span>';
+        else if (e.status === "partial_or_failed") statusBadge = '<span class="badge partial">Partial</span>';
+        else if (e.status === "started") statusBadge = '<span class="badge info">Incomplete</span>';
+        else statusBadge = `<span class="badge bad">${esc(e.status || "error")}</span>`;
+        const dur = e.duration_ms ? (e.duration_ms / 1000).toFixed(1) + "s" : "—";
+        let detail = "";
+        if (e.results && e.results.length) {
+          detail = e.results.map(r => `${r.success ? "✓" : "✗"} ${esc(r.name)}`).join(", ");
+        } else if (e.failure_reason) {
+          detail = esc(e.failure_reason);
+        }
+        return `<tr>
+          <td>${time}</td>
+          <td>${esc(e.email || "")}</td>
+          <td>${slot}</td>
+          <td>${statusBadge}</td>
+          <td><span class="badge info">${esc(e.source || "?")}</span></td>
+          <td>${dur}</td>
+          <td style="max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${detail}</td>
+        </tr>`;
+      }).join("");
+      el.innerHTML = rows || '<tr><td colspan="7" style="text-align:center;color:var(--muted)">No events found</td></tr>';
+    }
+
+    function esc(s) {
+      const d = document.createElement("div");
+      d.textContent = s;
+      return d.innerHTML;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+version: 0.2
+
+env:
+  shell: bash
+
+phases:
+  pre_build:
+    commands:
+      - aws --version
+      - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
+      - IMAGE_URI="$ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME:latest"
+  build:
+    commands:
+      - docker build -t "$IMAGE_URI" .
+  post_build:
+    commands:
+      - docker push "$IMAGE_URI"
+      - printf '{"imageUri":"%s"}\n' "$IMAGE_URI" > imageDetail.json
+artifacts:
+  files:
+    - imageDetail.json

@@ -1,0 +1,7 @@
+.venv
+.runtime
+__pycache__
+*.pyc
+credentials.json
+*.log
+.DS_Store

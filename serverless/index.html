@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FeatherFlight Booking</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#0f172a; --card:#111827; --text:#e5e7eb; --muted:#9ca3af; --accent:#38bdf8; --ok:#22c55e; --bad:#f87171; --border:#374151; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: radial-gradient(circle at top, #1e3a8a, var(--bg) 45%); color: var(--text); display: grid; place-items: center; padding: 24px; }
+    main { width: 100%; max-width: 520px; background: rgba(17,24,39,.92); border: 1px solid var(--border); border-radius: 20px; box-shadow: 0 24px 80px rgba(0,0,0,.35); padding: 28px; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    p { color: var(--muted); line-height: 1.5; }
+    label { display: block; margin: 16px 0 6px; font-weight: 650; }
+    input, select, button { width: 100%; font: inherit; border-radius: 12px; border: 1px solid var(--border); padding: 12px 14px; }
+    input, select { background: #030712; color: var(--text); }
+    button { margin-top: 22px; border: 0; color: #001018; background: var(--accent); font-weight: 800; cursor: pointer; }
+    button:disabled { opacity: .65; cursor: wait; }
+    .note { font-size: 13px; }
+    .result { margin-top: 20px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: #030712; white-space: pre-wrap; display: none; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size: 13px; line-height: 1.45; }
+    .ok { border-color: rgba(34,197,94,.6); }
+    .bad { border-color: rgba(248,113,113,.7); }
+    .footer { margin-top: 18px; font-size: 12px; color: var(--muted); }
+    .date-wrap { position: relative; }
+    .calendar { margin-top: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 14px; background: #030712; display: none; }
+    .date-wrap:hover .calendar, .date-wrap:focus-within .calendar { display: block; }
+    .cal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+    .cal-title { font-weight: 800; color: var(--text); }
+    .cal-nav { width: auto; margin: 0; padding: 6px 10px; border: 1px solid var(--border); color: var(--text); background: #111827; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+    .cal-weekday { text-align: center; color: var(--muted); font-size: 12px; padding: 4px 0; }
+    .cal-day { margin: 0; padding: 9px 0; border-radius: 10px; border: 1px solid transparent; color: var(--text); background: #111827; }
+    .cal-day:hover { border-color: var(--accent); }
+    .cal-day.selected { color: #001018; background: var(--accent); font-weight: 800; }
+    .cal-day.today { border-color: rgba(56,189,248,.55); }
+    .cal-day.muted { opacity: .35; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>FeatherFlight Booking</h1>
+    <p>Book a Spots for Members slot for all family members on your ZenPlanner account.</p>
+
+    <form id="booking-form">
+      <label for="email">ZenPlanner email</label>
+      <input id="email" name="email" type="email" autocomplete="username" required />
+
+      <label for="password">ZenPlanner password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required />
+
+      <label for="date">Date</label>
+      <div class="date-wrap">
+        <input id="date" name="date" type="text" inputmode="numeric" autocomplete="off" placeholder="YYYY-MM-DD" pattern="\d{4}-\d{2}-\d{2}" required aria-label="Type date as YYYY-MM-DD or choose from calendar" />
+        <div id="calendar" class="calendar" aria-label="Calendar date picker">
+          <div class="cal-head">
+            <button class="cal-nav" id="prev-month" type="button">‹</button>
+            <div class="cal-title" id="cal-title"></div>
+            <button class="cal-nav" id="next-month" type="button">›</button>
+          </div>
+          <div class="cal-grid" id="cal-weekdays"></div>
+          <div class="cal-grid" id="cal-days"></div>
+        </div>
+      </div>
+
+      <label for="time">Time</label>
+      <select id="time" name="time" required>
+        <option>4:00 PM</option>
+        <option>5:00 PM</option>
+        <option>6:00 PM</option>
+        <option>7:00 PM</option>
+        <option selected>8:00 PM</option>
+        <option>9:00 PM</option>
+      </select>
+
+      <p id="version" class="footer">Version 2026-06-07.5</p>
+      <button id="submit" type="submit">Book slot</button>
+    </form>
+
+    <div id="result" class="result"></div>
+    <p class="footer">Credentials are sent over HTTPS only for this request and are not stored by the page.</p>
+  </main>
+
+  <script>
+    const API_URL = "https://kvryaghlgk.execute-api.us-west-2.amazonaws.com/book";
+    const APP_VERSION = "2026-06-07.5";
+    const form = document.getElementById("booking-form");
+    const button = document.getElementById("submit");
+    const result = document.getElementById("result");
+    const dateInput = document.getElementById("date");
+    const calendar = document.getElementById("calendar");
+    const calTitle = document.getElementById("cal-title");
+    const calWeekdays = document.getElementById("cal-weekdays");
+    const calDays = document.getElementById("cal-days");
+    const prevMonth = document.getElementById("prev-month");
+    const nextMonth = document.getElementById("next-month");
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const weekdayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    let selectedDate = new Date();
+    let visibleMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+
+    function pad(n) { return String(n).padStart(2, "0"); }
+    function isoDate(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+    function humanDate(d) { return `${monthNames[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`; }
+    function sameDay(a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
+    function parseIsoDate(value) {
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+      if (!match) return null;
+      const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+      if (isoDate(d) !== value.trim()) return null;
+      return d;
+    }
+
+    function setSelectedDate(d) {
+      selectedDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      dateInput.value = isoDate(selectedDate);
+      visibleMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      calTitle.textContent = `${monthNames[visibleMonth.getMonth()]} ${visibleMonth.getFullYear()}`;
+      calWeekdays.innerHTML = weekdayNames.map(day => `<div class="cal-weekday">${day}</div>`).join("");
+      calDays.innerHTML = "";
+      const today = new Date();
+      const firstDay = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1);
+      const start = new Date(firstDay);
+      start.setDate(firstDay.getDate() - firstDay.getDay());
+      for (let i = 0; i < 42; i++) {
+        const d = new Date(start);
+        d.setDate(start.getDate() + i);
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "cal-day";
+        if (d.getMonth() !== visibleMonth.getMonth()) btn.classList.add("muted");
+        if (sameDay(d, today)) btn.classList.add("today");
+        if (sameDay(d, selectedDate)) btn.classList.add("selected");
+        btn.textContent = d.getDate();
+        btn.setAttribute("aria-label", humanDate(d));
+        btn.addEventListener("click", () => {
+          setSelectedDate(d);
+          dateInput.focus();
+        });
+        calDays.appendChild(btn);
+      }
+    }
+
+    dateInput.addEventListener("input", () => {
+      const typed = parseIsoDate(dateInput.value);
+      if (!typed) return;
+      selectedDate = typed;
+      visibleMonth = new Date(typed.getFullYear(), typed.getMonth(), 1);
+      renderCalendar();
+    });
+    prevMonth.addEventListener("click", () => {
+      visibleMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1);
+      renderCalendar();
+    });
+    nextMonth.addEventListener("click", () => {
+      visibleMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1);
+      renderCalendar();
+    });
+    setSelectedDate(new Date());
+
+    function show(message, ok) {
+      result.style.display = "block";
+      result.className = "result " + (ok ? "ok" : "bad");
+      result.textContent = message;
+    }
+
+    function icon(status) {
+      if (status === "success") return "✓";
+      if (status === "error") return "✗";
+      if (status === "warning") return "!";
+      return "•";
+    }
+
+    function summarize(data) {
+      const lines = [];
+      lines.push(data.ok ? "✓ Booking request finished" : "✗ Booking request finished with an issue");
+      lines.push(data.message || data.status || "Done");
+      if (data.date && data.time) lines.push(`Slot: ${data.date} ${data.time}`);
+      if (data.slot_details) lines.push(`Details: ${data.slot_details}`);
+      if (typeof data.success_count === "number") lines.push(`Booked: ${data.success_count}/${data.family_count}`);
+
+      if (Array.isArray(data.steps) && data.steps.length) {
+        lines.push("", "Progress log:");
+        for (const step of data.steps) lines.push(`${icon(step.status)} ${step.message}`);
+      }
+
+      if (Array.isArray(data.results) && data.results.length) {
+        lines.push("", "Result by person:");
+        for (const r of data.results) lines.push(`${r.success ? "✓" : "✗"} ${r.name}: ${r.message || (r.success ? "booked" : "failed")}`);
+      }
+      if (Array.isArray(data.available_slots) && data.available_slots.length) {
+        lines.push("", "Available slots:", ...data.available_slots.map(slot => `• ${slot}`));
+      }
+      return lines.join("\n");
+    }
+
+    function makeLiveLog(payload) {
+      const start = Date.now();
+      const base = [
+        `• Preparing booking request for ${payload.email}`,
+        `• Target slot: ${payload.date} ${payload.time}`,
+        "• Sending request to booking backend...",
+      ];
+      const timed = [
+        [2, "• Backend is logging in to ZenPlanner..."],
+        [6, "• Backend is searching the FeatherFlight calendar..."],
+        [12, "• Backend may be discovering membership/family IDs..."],
+        [18, "• Backend may be submitting reservations now..."],
+      ];
+      return setInterval(() => {
+        const elapsed = Math.floor((Date.now() - start) / 1000);
+        const lines = [...base, ...timed.filter(([sec]) => elapsed >= sec).map(([, msg]) => msg)];
+        lines.push(``, `Elapsed: ${elapsed}s`);
+        show(lines.join("\n"), true);
+      }, 1000);
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!API_URL || API_URL.includes("execute-api") === false) {
+        show("API configuration is invalid. Please refresh the page.", false);
+        return;
+      }
+      button.disabled = true;
+      button.textContent = "Booking...";
+      const payload = Object.fromEntries(new FormData(form).entries());
+      show([
+        `• Preparing booking request for ${payload.email}`,
+        `• Target slot: ${payload.date} ${payload.time}`,
+        "• Sending request to booking backend...",
+        "",
+        "Elapsed: 0s",
+      ].join("\n"), true);
+      const liveLog = makeLiveLog(payload);
+      try {
+        const response = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Booking-Source": "web_ui" },
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json();
+        clearInterval(liveLog);
+        show(summarize(data), !!data.ok);
+      } catch (err) {
+        clearInterval(liveLog);
+        show(`Request failed: ${err.message}`, false);
+      } finally {
+        button.disabled = false;
+        button.textContent = "Book slot";
+      }
+    });
+  </script>
+</body>
+</html>

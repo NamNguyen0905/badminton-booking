@@ -1,0 +1,11 @@
+# badminton tunnel, VPS side. Serves the booking page and API only.
+tunnel: __TUNNEL_ID__
+credentials-file: /etc/cloudflared/__TUNNEL_ID__.json
+protocol: http2
+
+ingress:
+  - hostname: badminton.nhtnm.com
+    service: http://api:8080
+  - hostname: badminton-vps.nhtnm.com
+    service: http://api:8080
+  - service: http_status:404

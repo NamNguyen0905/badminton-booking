@@ -1,0 +1,5 @@
+{
+  "runtime": "docker",
+  "startCommand": "streamlit run featherflight_mini.py --server.address 0.0.0.0 --server.port ${PORT:-8501}",
+  "notes": "Build this Docker image and deploy to AWS App Runner or another container host. Do not include credentials.json or .runtime in the image."
+}

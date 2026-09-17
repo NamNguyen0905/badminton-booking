@@ -1,0 +1,36 @@
+# badminton.nhtnm.com: booking API + page, reached only through its own Cloudflare Tunnel.
+# Nothing is published on the host; the tunnel talks to the api container over this project's network.
+services:
+  api:
+    build:
+      context: ./src
+      dockerfile: vps/Dockerfile
+    image: badminton-api:local
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - /home/badminton/data:/data
+    networks: [badminton]
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
+
+  cloudflared:
+    image: cloudflare/cloudflared:2026.8.3@sha256:51c9cefcb4569df44e1ad403ab1d3d8065aa8e84339bcfc6aee75502e1140339
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    # Credentials are 0600 and owned by the badminton user; run as that user rather than loosening them.
+    user: "10003:10003"
+    volumes:
+      - /home/badminton/secrets/cloudflared:/etc/cloudflared:ro
+    networks: [badminton]
+    mem_limit: 64m
+    depends_on: [api]
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+networks:
+  badminton:
+    name: badminton
